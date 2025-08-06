@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Умный Вставщик Текста",
-  "version": "1.4.0",
-  "description": "Сохраняйте текст и вставляйте его в выбранные элементы на разных сайтах.",
+  "name": "Text-Passer+",
+  "version": "1.1.0",
+  "description": "Save the text and paste it into selected elements on different websites.",
   "permissions": [
     "storage",
     "activeTab",
