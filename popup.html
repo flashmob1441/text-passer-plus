@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <title>Быстрый вставщик</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="container">
+    <!-- ОСНОВНОЙ ЭКРАН -->
+    <div id="main-view">
+        <div class="header">
+            <h3>Сохраненный текст</h3>
+            <div class="tools">
+                <button id="add-text-btn" title="Добавить новый текст">+</button>
+                <button id="manage-selectors-btn" title="Управление элементами">⚙️</button>
+                <button id="select-element-btn" title="Выбрать элемент на странице">🎯</button>
+            </div>
+        </div>
+        <ul id="text-list"></ul>
+    </div>
+
+    <!-- ИСПРАВЛЕНО: ЭКРАН РЕДАКТИРОВАНИЯ ТЕКСТА (полная версия) -->
+    <div id="edit-view" class="hidden">
+        <div class="header">
+            <h3 id="edit-view-title">Добавить текст</h3>
+        </div>
+        <form id="edit-form">
+            <textarea id="text-input" rows="4" placeholder="Введите ваш текст..."></textarea>
+            <div class="edit-actions">
+                <button type="button" id="cancel-edit-btn">Отмена</button>
+                <button type="submit" id="save-edit-btn">Сохранить</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- НОВЫЙ ЭКРАН: УПРАВЛЕНИЕ СЕЛЕКТОРАМИ -->
+    <div id="manage-view" class="hidden">
+        <div class="header">
+            <h3>Элементы для сайта</h3>
+            <button id="back-to-main-btn" title="Назад">⬅️</button>
+        </div>
+        <ul id="selector-list">
+            <!-- Список селекторов будет здесь -->
+        </ul>
+        <div class="footer-actions">
+            <button id="clear-all-selectors-btn">🧹 Очистить все</button>
+        </div>
+    </div>
+
+    <!-- СТАТУСНАЯ СТРОКА -->
+    <div id="status-message" class="status"></div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>

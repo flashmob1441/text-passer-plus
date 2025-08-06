@@ -1,0 +1,13 @@
+{
+  "name": "text-inserter-extension",
+  "version": "1.3.0",
+  "description": "A Chrome extension to intelligently insert text snippets.",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/chrome": "^0.1.1"
+  }
+}

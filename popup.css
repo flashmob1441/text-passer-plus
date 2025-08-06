@@ -1,0 +1,169 @@
+body {
+    font-family: sans-serif;
+    width: 300px;
+    transition: height 0.2s ease-in-out;
+}
+.container {
+    padding: 10px;
+}
+.hidden {
+    display: none !important;
+}
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+h3 {
+    margin: 0;
+    font-size: 16px;
+}
+.tools button {
+    font-size: 16px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    margin-left: 4px;
+}
+#text-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+.list-item:hover {
+    background-color: #f0f0f0;
+}
+.list-item-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+.item-actions button {
+    font-size: 12px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+.item-actions button:hover {
+    background-color: #e0e0e0;
+}
+/* Состояние подтверждения удаления */
+.item-actions button.confirm-delete {
+    color: #fff;
+    background-color: #f44336;
+}
+
+/* Форма редактирования */
+#edit-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+.edit-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+.edit-actions button {
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    margin-left: 8px;
+}
+.edit-actions #save-edit-btn {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+}
+.status {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #555;
+    text-align: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.3s, color 0.3s;
+}
+/* Стили для временных сообщений в статусе */
+.status.error {
+    background-color: #FFCDD2;
+    color: #B71C1C;
+}
+.status.success {
+    background-color: #C8E6C9;
+    color: #1B5E20;
+}
+
+/* Стили для нового экрана управления */
+.selector-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+}
+.selector-name {
+    font-family: monospace;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+}
+.selector-item .delete-btn {
+    font-size: 14px;
+    color: #f44336;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.footer-actions {
+    margin-top: 15px;
+    border-top: 1px solid #ccc;
+    padding-top: 10px;
+    display: flex;
+    justify-content: center;
+}
+#clear-all-selectors-btn {
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    width: 100%;
+}
+#clear-all-selectors-btn:hover {
+    border-color: #f44336;
+    background-color: #fff0f0;
+}
