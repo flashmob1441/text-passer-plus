@@ -1,18 +1,22 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // --- Элементы DOM ---
+import { storageService } from './storage-service.js';
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const MESSAGE_TYPES = {
+        START_SELECTION: 'START_SELECTION',
+        INSERT_TEXT: 'INSERT_TEXT'
+    };
+
     const mainView = document.getElementById('main-view');
     const editView = document.getElementById('edit-view');
     const manageView = document.getElementById('manage-view');
 
-    // Кнопки
     const addTextBtn = document.getElementById('add-text-btn');
     const selectElementBtn = document.getElementById('select-element-btn');
     const manageSelectorsBtn = document.getElementById('manage-selectors-btn');
     const backToMainBtn = document.getElementById('back-to-main-btn');
     const clearAllSelectorsBtn = document.getElementById('clear-all-selectors-btn');
-    const cancelEditBtn = document.getElementById('cancel-edit-btn'); // Теперь этот элемент будет найден
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
 
-    // Списки и формы
     const textList = document.getElementById('text-list');
     const selectorList = document.getElementById('selector-list');
     const statusMessage = document.getElementById('status-message');
@@ -20,75 +24,96 @@ document.addEventListener('DOMContentLoaded', () => {
     const editViewTitle = document.getElementById('edit-view-title');
     const textInput = document.getElementById('text-input');
 
-    // --- Переменные состояния ---
-    let currentHostname = null;
-    let currentEditId = null;
     let statusTimeout;
 
-    // --- Инициализация ---
-    initializePopup();
+    let state = {
+        texts: [],
+        selectorsForHost: [],
+        hostname: null,
+        currentView: 'main',
+        editingText: null,
+    };
 
-    async function initializePopup() {
-        try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab && tab.url && !tab.url.startsWith('chrome://')) {
-                currentHostname = new URL(tab.url).hostname;
-            }
-        } catch (e) {
-            console.error("Error getting current tab:", e);
+    async function updateState(newStateChanges = {}) {
+        state = { ...state, ...newStateChanges };
+
+        const hostname = await getCurrentHost();
+        const texts = await storageService.getTexts();
+        const allSelectors = await storageService.getSiteSelectors();
+
+        state.hostname = hostname;
+        state.texts = texts;
+        state.selectorsForHost = allSelectors[hostname] || [];
+
+        render();
+    }
+
+    function render() {
+        mainView.classList.toggle('hidden', state.currentView !== 'main');
+        editView.classList.toggle('hidden', state.currentView !== 'edit');
+        manageView.classList.toggle('hidden', state.currentView !== 'manage');
+
+        renderTextList(state.texts);
+        renderSelectorList(state.selectorsForHost);
+        renderEditView(state.editingText);
+        renderStatusMessage(state.hostname, state.selectorsForHost.length);
+    }
+
+    function renderTextList(texts) {
+        textList.replaceChildren(); // Очищаем старый список
+        if (texts.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'status';
+            emptyMsg.textContent = 'Нет сохраненных текстов. Нажмите "+", чтобы добавить.';
+            textList.appendChild(emptyMsg);
+            return;
         }
-
-        await updateStatusMessage();
-        await loadAndRenderTexts();
-        setupEventListeners(); // Теперь эта функция отработает без ошибок
+        texts.forEach(textItem => textList.appendChild(createListItem(textItem)));
     }
 
-    // --- Переключение между видами ---
-    function showView(viewToShow) {
-        [mainView, editView, manageView].forEach(view => view.classList.add('hidden'));
-        viewToShow.classList.remove('hidden');
-        if (viewToShow === mainView) {
-            updateStatusMessage();
+    function renderSelectorList(selectors) {
+        selectorList.replaceChildren();
+        clearAllSelectorsBtn.disabled = selectors.length === 0;
+        if (selectors.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'status';
+            emptyMsg.textContent = 'Для этого сайта нет сохраненных элементов.';
+            selectorList.appendChild(emptyMsg);
+            return;
         }
+        selectors.forEach((sel, index) => selectorList.appendChild(createSelectorItem(sel, index)));
     }
 
-    // --- Обработчики событий ---
-    function setupEventListeners() {
-        // Главный экран
-        addTextBtn.addEventListener('click', () => showEditView()); // Используем обертку для сброса
-        selectElementBtn.addEventListener('click', handleSelectElement);
-        manageSelectorsBtn.addEventListener('click', handleManageSelectors);
-
-        // Экран редактирования текста
-        editForm.addEventListener('submit', handleSaveText);
-        cancelEditBtn.addEventListener('click', () => showView(mainView));
-
-        // Экран управления селекторами
-        backToMainBtn.addEventListener('click', () => showView(mainView)); // Теперь заработает
-        clearAllSelectorsBtn.addEventListener('click', handleClearAllSelectors);
-    }
-
-    function showEditView(textItem = null) {
-        if (textItem) {
-            currentEditId = textItem.id;
-            textInput.value = textItem.content;
+    function renderEditView(editingText) {
+        if (state.currentView !== 'edit') return;
+        if (editingText) {
+            textInput.value = editingText.content;
             editViewTitle.textContent = 'Редактировать текст';
         } else {
-            currentEditId = null;
             textInput.value = '';
             editViewTitle.textContent = 'Добавить новый текст';
         }
-        showView(editView);
         textInput.focus();
     }
 
+    function renderStatusMessage(hostname, selectorCount) {
+        const isEnabled = !!hostname;
+        selectElementBtn.disabled = !isEnabled;
+        manageSelectorsBtn.disabled = !isEnabled;
 
-    // --- Логика обработчиков ---
-    // ... (весь остальной код до updateStatusMessage остается без изменений) ...
+        if (!isEnabled) {
+            statusMessage.textContent = 'Расширение не работает на системных страницах.';
+        } else if (selectorCount > 0) {
+            statusMessage.textContent = `✅ Выбрано элементов для сайта: ${selectorCount}`;
+        } else {
+            statusMessage.textContent = '⚠️ Элементы для этого сайта не выбраны. Нажмите 🎯';
+        }
+    }
+
     async function handleSelectElement() {
         if (selectElementBtn.disabled) return;
-        await chrome.runtime.sendMessage({ type: 'START_SELECTION' });
-        showTemporaryStatus('🎯 Выберите элемент на странице...', 'info', 1500);
+        await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.START_SELECTION });
+        showTemporaryStatus('🎯 Выберите элемент на странице...', 'info', 2000);
         setTimeout(() => window.close(), 500);
     }
 
@@ -96,135 +121,44 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const textContent = textInput.value.trim();
         if (textContent) {
-            await saveText(textContent, currentEditId);
-            showView(mainView);
+            const idToUpdate = state.editingText ? state.editingText.id : null;
+            await storageService.saveText(textContent, idToUpdate);
+            await updateState({ currentView: 'main', editingText: null });
+            showTemporaryStatus('✅ Текст сохранен!', 'success');
         }
     }
 
-    async function handleManageSelectors() {
-        showView(manageView);
-        await renderSelectorList();
+    async function handleDeleteText(id) {
+        await storageService.deleteText(id);
+        await updateState(); // Обновляем состояние, что вызовет перерисовку
+        showTemporaryStatus('🗑️ Текст удален.', 'success');
     }
 
     async function handleClearAllSelectors() {
-        if (!currentHostname) return;
-        const { siteSelectors = {} } = await chrome.storage.local.get('siteSelectors');
-        if (siteSelectors[currentHostname]) {
-            delete siteSelectors[currentHostname];
-            await chrome.storage.local.set({ siteSelectors });
-            showTemporaryStatus('🧹 Все элементы для сайта удалены', 'success', 2000);
-            await renderSelectorList();
+        if (state.hostname) {
+            await storageService.clearAllSelectors(state.hostname);
+            await updateState();
+            showTemporaryStatus('🧹 Все элементы для сайта удалены.', 'success');
         }
     }
 
-    async function getStoredData(key) {
-        const data = await chrome.storage.local.get(key);
-        return data[key] || (key === 'texts' ? [] : {});
-    }
-
-    async function saveText(content, idToUpdate) {
-        let texts = await getStoredData('texts');
-        if (idToUpdate) {
-            const textIndex = texts.findIndex(t => t.id === idToUpdate);
-            if (textIndex > -1) texts[textIndex].content = content;
-        } else {
-            texts.push({ id: crypto.randomUUID(), content });
+    async function handleDeleteSelector(id) {
+        if (state.hostname) {
+            await storageService.deleteSelector(state.hostname, id);
+            await updateState();
         }
-        await chrome.storage.local.set({ texts });
-        await loadAndRenderTexts();
-        showTemporaryStatus('✅ Текст сохранен!', 'success', 2000);
-    }
-
-    async function deleteText(id) {
-        let texts = await getStoredData('texts');
-        texts = texts.filter(t => t.id !== id);
-        await chrome.storage.local.set({ texts });
-        await loadAndRenderTexts();
-        showTemporaryStatus('🗑️ Текст удален', 'success', 2000);
-    }
-
-    async function deleteSelector(selectorId) {
-        if (!currentHostname) return;
-        let siteSelectors = await getStoredData('siteSelectors');
-        let selectorsForHost = siteSelectors[currentHostname] || [];
-
-        selectorsForHost = selectorsForHost.filter(s => s.id !== selectorId);
-
-        if(selectorsForHost.length > 0) {
-            siteSelectors[currentHostname] = selectorsForHost;
-        } else {
-            delete siteSelectors[currentHostname];
-        }
-
-        await chrome.storage.local.set({ siteSelectors });
-        await renderSelectorList();
-    }
-
-    function showTemporaryStatus(message, type = 'info', duration = 3000) {
-        clearTimeout(statusTimeout);
-        statusMessage.textContent = message;
-        statusMessage.className = `status ${type}`;
-        statusTimeout = setTimeout(updateStatusMessage, duration);
-    }
-
-
-    // ИСПРАВЛЕНА ЛОГИКА В ЭТОЙ ФУНКЦИИ
-    async function updateStatusMessage() {
-        statusMessage.className = 'status'; // Сброс стилей
-        if (!currentHostname) {
-            statusMessage.textContent = 'Расширение не работает на этих страницах';
-            selectElementBtn.disabled = true;
-            manageSelectorsBtn.disabled = true; // Отключаем, если вкладка не подходит
-            return;
-        }
-
-        // Кнопки всегда активны, если вкладка подходит
-        selectElementBtn.disabled = false;
-        manageSelectorsBtn.disabled = false;
-
-        const siteSelectors = await getStoredData('siteSelectors');
-        const selectorsForHost = siteSelectors[currentHostname] || [];
-
-        if (selectorsForHost.length > 0) {
-            statusMessage.textContent = `✅ Выбрано элементов для сайта: ${selectorsForHost.length}`;
-        } else {
-            statusMessage.textContent = `⚠️ Элементы для этого сайта не выбраны`;
-        }
-    }
-
-    // ... (остальной код остается без изменений) ...
-    async function loadAndRenderTexts() {
-        textList.replaceChildren();
-        const texts = await getStoredData('texts');
-
-        if (texts.length === 0) {
-            const emptyMsg = document.createElement('div');
-            emptyMsg.className = 'status';
-            emptyMsg.textContent = 'Нет сохраненных текстов';
-            textList.appendChild(emptyMsg);
-            return;
-        }
-
-        texts.forEach(textItem => {
-            const li = createListItem(textItem);
-            textList.appendChild(li);
-        });
     }
 
     function createListItem(textItem) {
         const li = document.createElement('li');
         li.className = 'list-item';
         li.addEventListener('click', async () => {
-            if (!currentHostname) return;
-            const siteSelectors = await getStoredData('siteSelectors');
-            const selectorsForHost = siteSelectors[currentHostname] || [];
-
-            if (selectorsForHost.length > 0) {
-                chrome.runtime.sendMessage({ type: 'INSERT_TEXT', text: textItem.content });
-                window.close();
-            } else {
-                showTemporaryStatus('Сначала выберите элемент (🎯)', 'error', 3000);
+            if (!state.hostname || state.selectorsForHost.length === 0) {
+                showTemporaryStatus('Сначала выберите элемент для вставки (🎯)', 'error');
+                return;
             }
+            await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.INSERT_TEXT, text: textItem.content });
+            window.close();
         });
 
         const textSpan = document.createElement('span');
@@ -232,76 +166,41 @@ document.addEventListener('DOMContentLoaded', () => {
         textSpan.textContent = textItem.content;
         textSpan.title = textItem.content;
 
-        const actionsDiv = createActions(textItem);
-
-        li.append(textSpan, actionsDiv);
-        return li;
-    }
-
-    function createActions(textItem) {
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'item-actions';
 
         const editBtn = createButton('✏️', 'Редактировать', (e) => {
             e.stopPropagation();
-            showEditView(textItem);
+            updateState({ currentView: 'edit', editingText: textItem });
         });
 
         const deleteBtn = createButton('🗑️', 'Удалить', (e) => {
             e.stopPropagation();
-            if (!deleteBtn.dataset.confirm) {
-                deleteBtn.dataset.confirm = 'true';
-                deleteBtn.textContent = '❓';
-                deleteBtn.classList.add('confirm-delete');
-                deleteBtn.addEventListener('mouseleave', () => {
-                    deleteBtn.dataset.confirm = '';
-                    deleteBtn.textContent = '🗑️';
-                    deleteBtn.classList.remove('confirm-delete');
-                }, { once: true });
-            } else {
-                deleteText(textItem.id);
-            }
+            handleDeleteWithConfirmation(deleteBtn, () => handleDeleteText(textItem.id));
         });
 
         actionsDiv.append(editBtn, deleteBtn);
-        return actionsDiv;
+        li.append(textSpan, actionsDiv);
+        return li;
     }
 
-    async function renderSelectorList() {
-        selectorList.replaceChildren();
-        if (!currentHostname) return;
+    function createSelectorItem(sel, index) {
+        const li = document.createElement('li');
+        li.className = 'selector-item';
 
-        const siteSelectors = await getStoredData('siteSelectors');
-        const selectorsForHost = siteSelectors[currentHostname] || [];
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'selector-name';
+        nameSpan.textContent = `Элемент ${index + 1} (${index === 0 ? 'Высший приоритет' : 'Низший'})`;
+        nameSpan.title = sel.xpath || sel.css;
 
-        if (selectorsForHost.length === 0) {
-            const emptyMsg = document.createElement('div');
-            emptyMsg.className = 'status';
-            emptyMsg.textContent = 'Нет сохраненных элементов';
-            selectorList.appendChild(emptyMsg);
-            clearAllSelectorsBtn.disabled = true;
-            return;
-        }
-
-        clearAllSelectorsBtn.disabled = false;
-        selectorsForHost.forEach((sel, index) => {
-            const li = document.createElement('li');
-            li.className = 'selector-item';
-
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'selector-name';
-            nameSpan.textContent = `Элемент ${index + 1} (Приоритет: ${index === 0 ? 'Высший' : 'Низший'})`;
-            nameSpan.title = sel.xpath || sel.css;
-
-            const deleteBtn = createButton('🗑️', 'Удалить этот элемент', (e) => {
-                e.stopPropagation();
-                deleteSelector(sel.id);
-            });
-            deleteBtn.classList.add('delete-btn');
-
-            li.append(nameSpan, deleteBtn);
-            selectorList.appendChild(li);
+        const deleteBtn = createButton('🗑️', 'Удалить этот элемент', (e) => {
+            e.stopPropagation();
+            handleDeleteSelector(sel.id);
         });
+        deleteBtn.classList.add('delete-btn');
+
+        li.append(nameSpan, deleteBtn);
+        return li;
     }
 
     function createButton(text, title, onClick) {
@@ -311,4 +210,57 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', onClick);
         return button;
     }
+
+    function handleDeleteWithConfirmation(deleteBtn, deleteAction) {
+        if (!deleteBtn.dataset.confirm) {
+            deleteBtn.dataset.confirm = 'true';
+            deleteBtn.textContent = '❓';
+            deleteBtn.classList.add('confirm-delete');
+            const reset = () => {
+                deleteBtn.dataset.confirm = '';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.classList.remove('confirm-delete');
+            };
+            deleteBtn.addEventListener('mouseleave', reset, { once: true });
+            setTimeout(reset, 3000); // Сбрасываем через 3 секунды
+        } else {
+            deleteAction();
+        }
+    }
+
+    async function getCurrentHost() {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab && tab.url && !tab.url.startsWith('chrome://')) {
+                return new URL(tab.url).hostname;
+            }
+        } catch (e) {
+            console.error("Error getting current tab:", e);
+        }
+        return null;
+    }
+
+    function showTemporaryStatus(message, type = 'info', duration = 2500) {
+        clearTimeout(statusTimeout);
+        statusMessage.textContent = message;
+        statusMessage.className = `status ${type}`;
+        statusTimeout = setTimeout(() => {
+            statusMessage.className = 'status';
+            renderStatusMessage(state.hostname, state.selectorsForHost.length);
+        }, duration);
+    }
+
+    function setupEventListeners() {
+        addTextBtn.addEventListener('click', () => updateState({ currentView: 'edit', editingText: null }));
+        manageSelectorsBtn.addEventListener('click', () => updateState({ currentView: 'manage' }));
+        backToMainBtn.addEventListener('click', () => updateState({ currentView: 'main' }));
+        cancelEditBtn.addEventListener('click', () => updateState({ currentView: 'main', editingText: null }));
+
+        selectElementBtn.addEventListener('click', handleSelectElement);
+        editForm.addEventListener('submit', handleSaveText);
+        clearAllSelectorsBtn.addEventListener('click', handleClearAllSelectors);
+    }
+
+    setupEventListeners();
+    await updateState();
 });

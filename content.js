@@ -1,14 +1,17 @@
-// предотвращаем повторное подключение
 if (typeof window.isInserterScriptLoaded === 'undefined') {
     window.isInserterScriptLoaded = true;
 
-    /* ------------------------------------------------------------------
-       ПЕРЕМЕННЫЕ СОСТОЯНИЯ
-    ------------------------------------------------------------------ */
+    const MESSAGE_TYPES = {
+        START_SELECTION: 'START_SELECTION',
+        INSERT_TEXT: 'INSERT_TEXT',
+        ELEMENT_SELECTED: 'ELEMENT_SELECTED',
+        ACTIVATE_SELECTION_MODE: 'ACTIVATE_SELECTION_MODE',
+        EXECUTE_INSERTION: 'EXECUTE_INSERTION'
+    };
+
     let isSelectionModeActive = false;
     let lastHighlightedElement = null;
 
-    // РЕФАКТОРИНГ: Селекторы вынесены в константу для чистоты и легкой поддержки.
     const INTERACTIVE_ELEMENT_SELECTORS = [
         'input:not([type="hidden"])',
         'textarea',
@@ -17,16 +20,13 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         '[role="textbox"]'
     ];
 
-    /* ------------------------------------------------------------------
-       1. ФУНКЦИЯ ГЕНЕРАЦИИ CSS-СЕЛЕКТОРА (резерв)
-    ------------------------------------------------------------------ */
     function generateCssSelector(el) {
         if (!(el instanceof Element)) return;
         const path = [];
         while (el.nodeType === Node.ELEMENT_NODE) {
             let selector = el.nodeName.toLowerCase();
             if (el.id) {
-                selector = `#${CSS.escape(el.id)}`; // РЕФАКТОРИНГ: Используем CSS.escape для надежности
+                selector = `#${CSS.escape(el.id)}`;
                 path.unshift(selector);
                 break;
             } else {
@@ -43,9 +43,6 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         return path.join(' > ');
     }
 
-    /* ------------------------------------------------------------------
-       2. ФУНКЦИЯ ГЕНЕРАЦИИ XPATH (основной способ)
-    ------------------------------------------------------------------ */
     function generateXPath(el) {
         if (el === document.body) return '/html/body';
         const idx = (sib, name) =>
@@ -56,7 +53,6 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         const segs = [];
         for (; el && el.nodeType === 1; el = el.parentNode) {
             let name = el.localName.toLowerCase();
-            // Отдаем предпочтение более стабильным атрибутам
             if (el.id) {
                 name += `[@id="${el.id}"]`;
             } else if (el.hasAttribute('name')) {
@@ -65,7 +61,6 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
                 name += `[@placeholder="${el.getAttribute('placeholder')}"]`;
             } else {
                 const position = idx(el);
-                // Добавляем позицию, только если она не первая, для краткости
                 if (position > 1) {
                     name += `[${position}]`;
                 }
@@ -75,9 +70,6 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         return '/' + segs.join('/');
     }
 
-    /* ------------------------------------------------------------------
-       3. ПОИСК ИНТЕРАКТИВНОГО ЭЛЕМЕНТА
-    ------------------------------------------------------------------ */
     function findInteractiveElement(container, maxDepth = 5) {
         if (!container || maxDepth <= 0) return null;
 
@@ -92,15 +84,10 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
             const found = container.querySelector(selector);
             if (found) return found;
         }
-        // Рекурсивный поиск можно убрать, если querySelector на контейнере покрывает все случаи
         return null;
     }
 
-    /* ------------------------------------------------------------------
-       4. УСТАНОВКА ТЕКСТА В ЭЛЕМЕНТ
-    ------------------------------------------------------------------ */
     function setElementValue(element, text) {
-        // ... (код функции оставлен без изменений, он очень хорош) ...
         const add = (current) => current ? `${current} ${text}` : text;
         let updated = false;
 
@@ -144,10 +131,6 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         return updated;
     }
 
-    /* ------------------------------------------------------------------
-       5. УПРАВЛЕНИЕ РЕЖИМОМ ВЫБОРА
-    ------------------------------------------------------------------ */
-
     function showPageNotification(message, type = 'success') {
         const notificationId = 'text-inserter-notification';
         let notification = document.getElementById(notificationId);
@@ -160,11 +143,10 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         notification.id = notificationId;
         notification.textContent = message;
 
-        // Определяем цвет фона в зависимости от типа
         const backgroundColor = {
             success: '#4CAF50',
             error: '#f44336',
-            info: '#2196F3' // Новый цвет для информационных сообщений
+            info: '#2196F3'
         };
 
         Object.assign(notification.style, {
@@ -211,10 +193,8 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
             };
 
             try {
-                // Ждем ответ от background.js
-                const response = await chrome.runtime.sendMessage({ type: 'ELEMENT_SELECTED', selector });
+                const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ELEMENT_SELECTED, selector });
 
-                // Показываем уведомление на основе ответа
                 if (response.status === 'ok') {
                     showPageNotification('✅ Элемент для вставки сохранен!', 'success');
                 } else if (response.status === 'duplicate') {
@@ -232,7 +212,6 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         }
     };
 
-    // ... (код подсветки и обработчиков оставлен без изменений) ...
     const mouseOverHandler = (e) => {
         if (lastHighlightedElement) lastHighlightedElement.style.outline = '';
         const target = findInteractiveElement(e.target);
@@ -267,57 +246,48 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         isSelectionModeActive = false;
     }
 
-    /* ------------------------------------------------------------------
-       6. СЛУШАТЕЛЬ СООБЩЕНИЙ
-    ------------------------------------------------------------------ */
     chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         switch (request.type) {
-            case 'ACTIVATE_SELECTION_MODE':
+            case MESSAGE_TYPES.ACTIVATE_SELECTION_MODE:
                 activateSelectionMode();
                 sendResponse({ status: 'ok' });
                 break;
 
-            case 'EXECUTE_INSERTION': {
+            case MESSAGE_TYPES.EXECUTE_INSERTION: {
                 (async () => {
                     const host = location.hostname;
                     const { siteSelectors = {} } = await chrome.storage.local.get('siteSelectors');
-                    const selectors = siteSelectors[host]; // Это теперь массив
+                    const selectors = siteSelectors[host];
 
                     if (!selectors || selectors.length === 0) {
                         showPageNotification('🎯 Сначала выберите элемент на странице.', 'error');
                         return;
                     }
 
-                    // ИЗМЕНЕНО: Перебираем все селекторы и останавливаемся на первом успешном
                     let insertionSuccess = false;
                     for (const sel of selectors) {
                         let element = null;
 
-                        // 1. Пробуем XPath
                         if (sel.xpath) {
                             try {
                                 element = document.evaluate(sel.xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-                            } catch (e) {
-                                console.warn("XPath evaluation failed:", sel.xpath, e);
-                            }
+                            } catch (e) { console.warn("XPath evaluation failed:", sel.xpath, e); }
                         }
-
-                        // 2. Если не нашли — пробуем CSS
                         if (!element && sel.css) {
                             element = document.querySelector(sel.css);
                         }
 
-                        // Если элемент найден, вставляем текст и выходим из цикла
                         if (element) {
-                            const target = findInteractiveElement(element) || element;
-                            if (setElementValue(target, request.text)) {
+                            const isAlreadyInteractive = ['INPUT', 'TEXTAREA'].includes(element.tagName) || element.isContentEditable;
+                            const target = isAlreadyInteractive ? element : findInteractiveElement(element);
+
+                            if (target && setElementValue(target, request.text)) {
                                 insertionSuccess = true;
-                                break; // Успех! Прерываем цикл.
+                                break;
                             }
                         }
                     }
 
-                    // Показываем уведомление в зависимости от итогового результата
                     if (insertionSuccess) {
                         showPageNotification('✅ Текст вставлен!');
                     } else {
