@@ -12,7 +12,7 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js",
+    "scripts": ["background.js"],
     "type": "module"
   },
   "action": {
@@ -21,5 +21,10 @@
     }
   },
   "icons": {
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "text-passer-plus@example.com"
+    }
   }
 }

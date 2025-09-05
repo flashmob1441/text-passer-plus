@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderTextList(texts) {
-        textList.replaceChildren(); // Очищаем старый список
+        textList.replaceChildren();
         if (texts.length === 0) {
             const emptyMsg = document.createElement('div');
             emptyMsg.className = 'status';
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function handleSelectElement() {
         if (selectElementBtn.disabled) return;
-        await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.START_SELECTION });
+        await browser.runtime.sendMessage({ type: MESSAGE_TYPES.START_SELECTION });
         showTemporaryStatus('🎯 Выберите элемент на странице...', 'info', 2000);
         setTimeout(() => window.close(), 500);
     }
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function handleDeleteText(id) {
         await storageService.deleteText(id);
-        await updateState(); // Обновляем состояние, что вызовет перерисовку
+        await updateState();
         showTemporaryStatus('🗑️ Текст удален.', 'success');
     }
 
@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showTemporaryStatus('Сначала выберите элемент для вставки (🎯)', 'error');
                 return;
             }
-            await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.INSERT_TEXT, text: textItem.content });
+            await browser.runtime.sendMessage({ type: MESSAGE_TYPES.INSERT_TEXT, text: textItem.content });
             window.close();
         });
 
@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 deleteBtn.classList.remove('confirm-delete');
             };
             deleteBtn.addEventListener('mouseleave', reset, { once: true });
-            setTimeout(reset, 3000); // Сбрасываем через 3 секунды
+            setTimeout(reset, 3000);
         } else {
             deleteAction();
         }
@@ -230,8 +230,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function getCurrentHost() {
         try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab && tab.url && !tab.url.startsWith('chrome://')) {
+            const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+            if (tab && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
                 return new URL(tab.url).hostname;
             }
         } catch (e) {

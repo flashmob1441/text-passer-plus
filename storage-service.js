@@ -1,10 +1,10 @@
 export const storageService = {
     async _get(key, defaultValue = null) {
-        const result = await chrome.storage.local.get(key);
+        const result = await browser.storage.local.get(key);
         return result[key] === undefined ? defaultValue : result[key];
     },
     async _set(key, value) {
-        return chrome.storage.local.set({ [key]: value });
+        return browser.storage.local.set({ [key]: value });
     },
 
     async getTexts() {

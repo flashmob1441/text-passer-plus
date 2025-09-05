@@ -193,7 +193,7 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
             };
 
             try {
-                const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ELEMENT_SELECTED, selector });
+                const response = await browser.runtime.sendMessage({ type: MESSAGE_TYPES.ELEMENT_SELECTED, selector });
 
                 if (response.status === 'ok') {
                     showPageNotification('✅ Элемент для вставки сохранен!', 'success');
@@ -246,7 +246,7 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
         isSelectionModeActive = false;
     }
 
-    chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+    browser.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         switch (request.type) {
             case MESSAGE_TYPES.ACTIVATE_SELECTION_MODE:
                 activateSelectionMode();
@@ -256,7 +256,7 @@ if (typeof window.isInserterScriptLoaded === 'undefined') {
             case MESSAGE_TYPES.EXECUTE_INSERTION: {
                 (async () => {
                     const host = location.hostname;
-                    const { siteSelectors = {} } = await chrome.storage.local.get('siteSelectors');
+                    const { siteSelectors = {} } = await browser.storage.local.get('siteSelectors');
                     const selectors = siteSelectors[host];
 
                     if (!selectors || selectors.length === 0) {

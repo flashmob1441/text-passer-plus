@@ -1,6 +1,6 @@
 import { storageService } from './storage-service.js';
 
-console.log('Background service worker started.');
+console.log('Background script started.');
 
 const MESSAGE_TYPES = {
     START_SELECTION: 'START_SELECTION',
@@ -12,20 +12,20 @@ const MESSAGE_TYPES = {
 
 async function ensureAndSendMessage(tabId, message) {
     try {
-        await chrome.scripting.executeScript({
+        await browser.scripting.executeScript({
             target: { tabId },
             files: ['content.js']
         });
-        return await chrome.tabs.sendMessage(tabId, message);
+        return await browser.tabs.sendMessage(tabId, message);
     } catch (error) {
         console.error(`Could not execute script or send message in tab ${tabId}:`, error);
         return Promise.reject(error);
     }
 }
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
 
         if (!tab || !tab.id) {
             return { status: 'error', message: 'No active tab found' };
@@ -69,6 +69,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+browser.runtime.onInstalled.addListener(() => {
     console.log('Extension installed/updated.');
 });
